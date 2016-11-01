@@ -21,27 +21,21 @@ class Key {
     }
     writeKey("./localPrivateKey", localPrivateKey);
     BigInteger localPublicKey = modPow(generator, localPrivateKey, prime);
-    BigInteger testKey = generator.modPow(localPrivateKey, prime);
 
     System.out.println(localPrivateKey + " " + localPrivateKey.bitLength());
     System.out.println(localPublicKey + " " + localPublicKey.bitLength());
-    System.out.println(testKey +" "+ testKey.bitLength());
   }
 
   private BigInteger modPow(BigInteger base, BigInteger exponent, BigInteger modulus) {
     if(modulus == BigInteger.ONE) return BigInteger.ZERO;
     BigInteger c = BigInteger.ONE;
     String ex = exponent.toString(2);
-    //System.out.println(ex);
-    BigInteger temp;
-    for (int i = 0; i < ex.length(); i++) {
-      if (Character.toString(ex.charAt(0)).equals("1")) {
-        temp = c.multiply(base);
-        c = temp.mod(modulus);
+    while(ex.length() > 0) {
+      if ( ex.substring(ex.length()-1, ex.length()).equals("1")) {
+        c = c.multiply(base).mod(modulus);
       }
-      temp = c.multiply(c);
-      c = temp.mod(modulus);
-      ex.substring(0);
+      base = base.multiply(base).mod(modulus);
+      ex = ex.substring(0,ex.length()-1);
     }
     return c;
   }
