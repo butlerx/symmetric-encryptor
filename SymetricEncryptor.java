@@ -133,7 +133,8 @@ public class SymetricEncryptor {
         padding[message.length+1] = 1;
       }
       byte[] encryptedMessage = cipher.doFinal(message);
-      Path secPath = Paths.get("sec-" + file);
+      System.out.println(file + ".sec");
+      Path secPath = Paths.get(file + ".sec");
       Files.write(secPath, encryptedMessage);
     } catch (Exception e) {
       e.printStackTrace();
@@ -148,7 +149,9 @@ public class SymetricEncryptor {
       Path path = Paths.get(file);
       byte[] message = Files.readAllBytes(path);
       byte[] decryptedMessage = cipher.doFinal(message);
-      Path secPath = Paths.get("unsec-" + file);
+      file = file.substring(0, file.lastIndexOf('.'));
+      System.out.println(file);
+      Path secPath = Paths.get(file);
       Files.write(secPath, decryptedMessage);
     } catch (Exception e) {
       e.printStackTrace();
