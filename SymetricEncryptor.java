@@ -104,8 +104,18 @@ class Key {
 
 public class SymetricEncryptor {
   public static void main(final String[] args) throws Exception {
-    byte [] key = new Key().init();
-    encrypt("code.zip", key);
+    String flag = args[0];
+    if ( flag.equals("encrypt")) {
+      byte [] key = new Key().init();
+      encrypt(args[1], key);
+    } else {
+      if ( flag.equals("decrypt")) {
+        byte [] key = new Key().init();
+        decrypt(args[1], key);
+      } else {
+      System.out.println("Sorry thats not one of my arguments use either encrypt or decrypt filename");
+      }
+    }
   }
 
   public static void encrypt(String file, byte [] key) {
@@ -116,7 +126,7 @@ public class SymetricEncryptor {
       Path path = Paths.get(file);
       byte[] message = Files.readAllBytes(path);
       byte[] encryptedMessage = cipher.doFinal(message);
-      Path secPath = Paths.get(file + ".sec");
+      Path secPath = Paths.get("sec-" + file);
       Files.write(secPath, encryptedMessage);
     } catch (Exception e) {
       e.printStackTrace();
@@ -125,6 +135,14 @@ public class SymetricEncryptor {
 
   public static void decrypt (String file, byte [] key) {
     try {
+      SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+      Cipher cipher  = Cipher.getInstance("AES");
+      cipher.init(Cipher.DECRYPT_MODE, keySpec);
+      Path path = Paths.get(file);
+      byte[] message = Files.readAllBytes(path);
+      byte[] decryptedMessage = cipher.doFinal(message);
+      Path secPath = Paths.get("unsec-" + file);
+      Files.write(secPath, decryptedMessage);
     } catch (Exception e) {
       e.printStackTrace();
     }
