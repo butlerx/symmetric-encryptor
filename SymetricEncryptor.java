@@ -1,5 +1,6 @@
 import java.math.BigInteger;
 import javax.crypto.*;
+import javax.crypto.spec.*;
 import java.security.*;
 import java.io.*;
 import java.nio.file.*;
@@ -7,11 +8,15 @@ import java.nio.charset.*;
 import java.util.*;
 
 class Key {
-  public void init() {
+  public byte [] init() {
     String primeString =  readFile("./prime");
     String generatorString = readFile("./generator");
     String publicKeyString = readFile("./publicKey");
+
     BigInteger localPrivateKey = loadKey("./localPrivateKey");
+    BigInteger localPublicKey = loadKey("./localPublicKey");
+    BigInteger sharedKey = loadKey("./sharedKey");
+
     BigInteger prime = new BigInteger(primeString, 16);
     BigInteger generator = new BigInteger(generatorString, 16);
     BigInteger publicKey = new BigInteger(publicKeyString, 16);
@@ -19,11 +24,15 @@ class Key {
       Random rnd = new Random(System.currentTimeMillis());
       localPrivateKey = new BigInteger(1023, rnd);
     }
-    writeKey("./localPrivateKey", localPrivateKey);
-    BigInteger localPublicKey = modPow(generator, localPrivateKey, prime);
+    localPublicKey = modPow(generator, localPrivateKey, prime);
+    sharedKey = modPow(publicKey, localPrivateKey, prime);
 
-    System.out.println(localPrivateKey + " " + localPrivateKey.bitLength());
-    System.out.println(localPublicKey + " " + localPublicKey.bitLength());
+    writeKey("./localPrivateKey", localPrivateKey);
+    writeKey("./localPublicKey", localPublicKey);
+    writeKey("./sharedKey", sharedKey);
+
+    byte [] hashedKey = hash(sharedKey);
+    return hashedKey;
   }
 
   private BigInteger modPow(BigInteger base, BigInteger exponent, BigInteger modulus) {
@@ -40,6 +49,18 @@ class Key {
     return c;
   }
 
+  private byte [] hash (BigInteger bi) {
+    try {
+      MessageDigest md = MessageDigest.getInstance("SHA-256");
+      String hash = bi.toString(16);
+      md.update(hash.getBytes());
+      byte [] digest = md.digest();
+      return digest;
+    } catch (Exception e) {
+        return null;
+    }
+  }
+
   private String readFile (String filePath) {
     try {
       StringBuffer fileData = new StringBuffer();
@@ -53,7 +74,6 @@ class Key {
       reader.close();
       return fileData.toString().replace("\n", "").replace("\r", "");
     } catch(IOException e) {
-      System.out.println(e.getMessage());
       return null;
     }
   }
@@ -65,8 +85,7 @@ class Key {
       BigInteger c = BigInteger.ZERO;
       return c;
     } catch(IOException e) {
-      System.out.println(e.getMessage());
-      String localPrivateKeyString = readFile("./localPrivateKey");
+      String localPrivateKeyString = readFile(filePath);
       BigInteger localPrivateKey = new BigInteger(localPrivateKeyString, 16);
       return localPrivateKey;
     }
@@ -75,7 +94,7 @@ class Key {
   private void writeKey (String fileName, BigInteger key) {
     try {
       List<String> lines = Arrays.asList(key.toString(16));
-      Path file = Paths.get("localPrivateKey");
+      Path file = Paths.get(fileName);
       Files.write(file, lines, Charset.forName("UTF-8"));
     } catch(IOException e) {
       System.out.println(e.getMessage());
@@ -85,6 +104,29 @@ class Key {
 
 public class SymetricEncryptor {
   public static void main(final String[] args) throws Exception {
-    new Key().init();
+    byte [] key = new Key().init();
+    encrypt("code.zip", key);
+  }
+
+  public static void encrypt(String file, byte [] key) {
+    try {
+      SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+      Cipher cipher  = Cipher.getInstance("AES");
+      cipher.init(Cipher.ENCRYPT_MODE, keySpec);
+      Path path = Paths.get(file);
+      byte[] message = Files.readAllBytes(path);
+      byte[] encryptedMessage = cipher.doFinal(message);
+      Path secPath = Paths.get(file + ".sec");
+      Files.write(secPath, encryptedMessage);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  public static void decrypt (String file, byte [] key) {
+    try {
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 }
