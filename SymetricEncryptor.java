@@ -125,6 +125,13 @@ public class SymetricEncryptor {
       cipher.init(Cipher.ENCRYPT_MODE, keySpec);
       Path path = Paths.get(file);
       byte[] message = Files.readAllBytes(path);
+      if (message.length % 16 != 0 ) {
+        byte [] padding = new byte[message.length + (message.length%16)];
+        for (int i = 0; i<message.length; i++) {
+          padding[i] = message[i];
+        }
+        padding[message.length+1] = 1;
+      }
       byte[] encryptedMessage = cipher.doFinal(message);
       Path secPath = Paths.get("sec-" + file);
       Files.write(secPath, encryptedMessage);
