@@ -8,44 +8,15 @@ import javax.crypto.*;
 import javax.crypto.spec.*;
 import javax.xml.bind.DatatypeConverter;
 
-class IV {
-
-  IV(){}
-
-  public byte [] get() {
-    String filePath = "./iv";
-    File fs = new File();
-    try {
-      Path file = Paths.get(filePath);
-      Files.createFile(file);
-      byte [] iv = new byte[16];
-      SecureRandom random = new SecureRandom();
-      random.nextBytes(iv);
-      fs.write(filePath, iv);
-      return iv;
-    } catch(IOException err) {
-      byte[] iv = new byte[16];
-      try(FileInputStream fis = new FileInputStream(filePath)){
-        fis.read(iv);
-      } catch(IOException e) {
-        System.out.println(e.getMessage());
-      }
-      return iv;
-    }
-  }
-}
-
 class Key {
   Key(){}
   public byte [] get(byte [] pass) {
-    byte [] salt = getSalt();
+    byte [] salt = getSec("salt");
     byte[] salted = new byte[pass.length + salt.length];
     System.arraycopy(pass, 0, salted, 0, pass.length);
     System.arraycopy(salt, 0, salted, pass.length, salt.length);
-    File fs = new File();
-    BigInteger mod = new BigInteger(fs.read("./Modulus"), 16);
     byte [] hashedKey = hash(salted);
-    BigInteger encryptionKey = modPow(new BigInteger(hashedKey), new BigInteger("65537"), mod);
+    BigInteger encryptionKey = modPow(hashedKey);
     return hashedKey;
   }
 
@@ -61,16 +32,15 @@ class Key {
     }
   }
 
-  private byte [] getSalt() {
-    String filePath = "./salt";
+  public byte [] getSec(String fileString) {
+    String filePath = "./" + fileString;
     try {
       Path file = Paths.get(filePath);
       Files.createFile(file);
       byte [] salt = new byte[16];
       SecureRandom random = new SecureRandom();
       random.nextBytes(salt);
-      File fs = new File();
-      fs.write(filePath, salt);
+      write(filePath, salt);
       return salt;
     } catch(IOException err) {
       byte[] salt = new byte[16];
@@ -83,8 +53,11 @@ class Key {
     }
   }
 
-  private BigInteger modPow(BigInteger base, BigInteger exponent, BigInteger modulus) {
+  private BigInteger modPow(byte [] key) {
+    BigInteger modulus = readMod();
     if(modulus == BigInteger.ONE) return BigInteger.ZERO;
+    BigInteger base = new BigInteger(key);
+    BigInteger exponent = new BigInteger("65537");
     BigInteger c = BigInteger.ONE;
     String ex = exponent.toString(2);
     while(ex.length() > 0) {
@@ -94,16 +67,21 @@ class Key {
       base = base.multiply(base).mod(modulus);
       ex = ex.substring(0, ex.length() - 1);
     }
-    new File().write("./pass", c.toByteArray());
+    write("./pass", c.toByteArray());
     return c;
   }
-}
 
-class File {
+  private void write (String fileName, byte [] key) {
+    String data = DatatypeConverter.printHexBinary(key);
+    try(PrintWriter out = new PrintWriter(fileName)){
+      out.println(data);
+    } catch(IOException e) {
+      System.out.println(e.getMessage());
+    }
+  }
 
-  File(){}
-
-  public String read (String filePath) {
+  private BigInteger readMod () {
+    String filePath = "./Modulus";
     try {
       StringBuffer fileData = new StringBuffer();
       BufferedReader reader = new BufferedReader(new FileReader(filePath));
@@ -114,18 +92,9 @@ class File {
         fileData.append(readData);
       }
       reader.close();
-      return fileData.toString().replaceAll("\\s","").replaceAll("\\n", "").replaceAll("\\r", "");
+      return new BigInteger(fileData.toString().replaceAll("\\s","").replaceAll("\\n", "").replaceAll("\\r", ""), 16);
     } catch(IOException e) {
       return null;
-    }
-  }
-
-  public void write (String fileName, byte [] key) {
-    String data = DatatypeConverter.printHexBinary(key);
-    try(PrintWriter out = new PrintWriter(fileName)){
-      out.println(data);
-    } catch(IOException e) {
-      System.out.println(e.getMessage());
     }
   }
 }
@@ -160,7 +129,7 @@ public class SymetricEncryptor {
     try {
       SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
       Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-      byte [] iv = new IV().get();
+      byte [] iv = new Key().getSec("iv");
       IvParameterSpec ivspec = new IvParameterSpec(iv);
       cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivspec);
       Path path = Paths.get(file);
@@ -187,11 +156,12 @@ public class SymetricEncryptor {
     try {
       SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
       Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-      byte [] iv = new IV().get();
+      byte [] iv = new Key().getSec("iv");
       IvParameterSpec ivspec = new IvParameterSpec(iv);
       cipher.init(Cipher.DECRYPT_MODE, keySpec, ivspec);
       Path path = Paths.get(file);
       byte[] message = Files.readAllBytes(path);
+
       byte[] decryptedMessage = cipher.doFinal(message);
       file = file.substring(0, file.lastIndexOf('.'));
       System.out.println(file);
