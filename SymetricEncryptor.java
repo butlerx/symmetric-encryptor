@@ -135,7 +135,8 @@ public class SymetricEncryptor {
       byte[] encryptedMessage = cipher.doFinal(message);
       System.out.println(file + ".sec");
       Path secPath = Paths.get(file + ".sec");
-      Files.write(secPath, encryptedMessage);
+      List<String> lines = Arrays.asList(javax.xml.bind.DatatypeConverter.printHexBinary(encryptedMessage));
+      Files.write(secPath, lines, Charset.forName("UTF-8"));
     } catch (Exception e) {
       e.printStackTrace();
     }
