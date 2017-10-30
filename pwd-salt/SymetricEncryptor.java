@@ -1,3 +1,27 @@
+/*
+  MIT License
+
+  Copyright (c) 2016 Cian Butler
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+*/
+
 import java.io.*;
 import java.math.BigInteger;
 import java.nio.charset.*;
@@ -8,44 +32,15 @@ import javax.crypto.*;
 import javax.crypto.spec.*;
 import javax.xml.bind.DatatypeConverter;
 
-class IV {
-
-  IV(){}
-
-  public byte [] get() {
-    String filePath = "./iv";
-    File fs = new File();
-    try {
-      Path file = Paths.get(filePath);
-      Files.createFile(file);
-      byte [] iv = new byte[16];
-      SecureRandom random = new SecureRandom();
-      random.nextBytes(iv);
-      fs.write(filePath, iv);
-      return iv;
-    } catch(IOException err) {
-      byte[] iv = new byte[16];
-      try(FileInputStream fis = new FileInputStream(filePath)){
-        fis.read(iv);
-      } catch(IOException e) {
-        System.out.println(e.getMessage());
-      }
-      return iv;
-    }
-  }
-}
-
 class Key {
   Key(){}
   public byte [] get(byte [] pass) {
-    byte [] salt = getSalt();
+    byte [] salt = getSec("salt");
     byte[] salted = new byte[pass.length + salt.length];
     System.arraycopy(pass, 0, salted, 0, pass.length);
     System.arraycopy(salt, 0, salted, pass.length, salt.length);
-    File fs = new File();
-    BigInteger mod = new BigInteger(fs.read("./Modulus"), 16);
     byte [] hashedKey = hash(salted);
-    BigInteger encryptionKey = modPow(new BigInteger(hashedKey), new BigInteger("65537"), mod);
+    BigInteger encryptionKey = modPow(hashedKey);
     return hashedKey;
   }
 
@@ -61,16 +56,15 @@ class Key {
     }
   }
 
-  private byte [] getSalt() {
-    String filePath = "./salt";
+  public byte [] getSec(String fileString) {
+    String filePath = "./" + fileString + ".txt";
     try {
       Path file = Paths.get(filePath);
       Files.createFile(file);
       byte [] salt = new byte[16];
       SecureRandom random = new SecureRandom();
       random.nextBytes(salt);
-      File fs = new File();
-      fs.write(filePath, salt);
+      write(filePath, salt);
       return salt;
     } catch(IOException err) {
       byte[] salt = new byte[16];
@@ -83,8 +77,11 @@ class Key {
     }
   }
 
-  private BigInteger modPow(BigInteger base, BigInteger exponent, BigInteger modulus) {
+  private BigInteger modPow(byte [] key) {
+    BigInteger modulus = readMod();
     if(modulus == BigInteger.ONE) return BigInteger.ZERO;
+    BigInteger base = new BigInteger(key);
+    BigInteger exponent = new BigInteger("65537");
     BigInteger c = BigInteger.ONE;
     String ex = exponent.toString(2);
     while(ex.length() > 0) {
@@ -94,16 +91,21 @@ class Key {
       base = base.multiply(base).mod(modulus);
       ex = ex.substring(0, ex.length() - 1);
     }
-    new File().write("./pass", c.toByteArray());
+    write("./RSAPassword.txt", c.toByteArray());
     return c;
   }
-}
 
-class File {
+  private void write (String fileName, byte [] key) {
+    String data = DatatypeConverter.printHexBinary(key);
+    try(PrintWriter out = new PrintWriter(fileName)){
+      out.println(data);
+    } catch(IOException e) {
+      System.out.println(e.getMessage());
+    }
+  }
 
-  File(){}
-
-  public String read (String filePath) {
+  private BigInteger readMod () {
+    String filePath = "./Modulus";
     try {
       StringBuffer fileData = new StringBuffer();
       BufferedReader reader = new BufferedReader(new FileReader(filePath));
@@ -114,90 +116,92 @@ class File {
         fileData.append(readData);
       }
       reader.close();
-      return fileData.toString().replaceAll("\\s","").replaceAll("\\n", "").replaceAll("\\r", "");
+      return new BigInteger(fileData.toString().replaceAll("\\s","").replaceAll("\\n", "").replaceAll("\\r", ""), 16);
     } catch(IOException e) {
       return null;
-    }
-  }
-
-  public void write (String fileName, byte [] key) {
-    String data = DatatypeConverter.printHexBinary(key);
-    try(PrintWriter out = new PrintWriter(fileName)){
-      out.println(data);
-    } catch(IOException e) {
-      System.out.println(e.getMessage());
     }
   }
 }
 
 public class SymetricEncryptor {
   public static void main(final String[] args) throws Exception {
-    String flag = args[0];
-    if ( flag.equals("-e")) {
-      byte [] pass = getPwd();
+    String arg = args[0];
+    if (arg != null && !arg.isEmpty()) {
+      byte [] pass = getArg("Enter Password");
       Key key = new Key();
-      encrypt(args[1], key.get(pass));
-    } else {
-      if ( flag.equals("-d")) {
-        byte [] pass = getPwd();
-        Key key = new Key();
-        decrypt(args[1], key.get(pass));
-      } else {
-        System.out.println("Sorry thats not one of my arguments use either -e (encrypt) or -d (decrypt) <filename>");
+      if (arg.equals("-e")) {
+        encrypt(args[1], key.get(pass));
+        System.exit(0);
+      }
+      else if (arg.equals("-d")) {
+        decrypt(args[1], args[2], key.get(pass));
+        System.exit(0);
       }
     }
+    System.out.println("Sorry no file specified");
+    System.exit(1);
   }
 
-  public static byte [] getPwd() {
+  private static byte [] getArg(String msg) {
     Scanner scan = new Scanner(System.in);
-    System.out.print("Enter password: ");
+    System.out.print(msg+ ": ");
     String s = scan.next();
     scan.close();
     return s.getBytes(Charset.forName("UTF-8"));
   }
 
+
   public static void encrypt(String file, byte [] key) {
     try {
       SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
-      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-      byte [] iv = new IV().get();
+      Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
+      byte [] iv = new Key().getSec("iv");
       IvParameterSpec ivspec = new IvParameterSpec(iv);
       cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivspec);
       Path path = Paths.get(file);
       byte[] message = Files.readAllBytes(path);
-      int paddingSize = message.length%16 == 0 ? 16 : message.length%16;
-      byte [] paddedMsg = new byte[message.length + paddingSize];
-      if (message.length % 16 != 0 ) {
-        for (int i = 0; i < message.length; i++) {
-          paddedMsg[i] = message[i];
-        }
-        paddedMsg[message.length+1] = 1;
-      }
-      byte[] encryptedMessage = cipher.doFinal(paddedMsg);
-      System.out.println(file + ".sec");
-      Path secPath = Paths.get(file + ".sec");
-      Files.write(secPath, encryptedMessage);
+      byte[] encryptedMessage = cipher.doFinal(pad(message));
+      System.out.println(DatatypeConverter.printHexBinary(encryptedMessage));
     } catch (Exception e) {
       e.printStackTrace();
     }
   }
 
-  public static void decrypt (String file, byte [] key) {
+  public static void decrypt (String in, String out, byte [] key) {
     try {
       SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
-      Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-      byte [] iv = new IV().get();
+      Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
+      byte [] iv = new Key().getSec("iv");
       IvParameterSpec ivspec = new IvParameterSpec(iv);
       cipher.init(Cipher.DECRYPT_MODE, keySpec, ivspec);
-      Path path = Paths.get(file);
-      byte[] message = Files.readAllBytes(path);
-      byte[] decryptedMessage = cipher.doFinal(message);
-      file = file.substring(0, file.lastIndexOf('.'));
-      System.out.println(file);
-      Path secPath = Paths.get(file);
+      Path path = Paths.get(in);
+      byte[] message = DatatypeConverter.parseHexBinary(new String(Files.readAllBytes(path)).replaceAll("\\s","").replaceAll("\\n", "").replaceAll("\\r", ""));
+      byte[] decryptedMessage = unpad(cipher.doFinal(message));
+      System.out.println(out);
+      Path secPath = Paths.get(out);
       Files.write(secPath, decryptedMessage);
     } catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  private static byte[] pad(byte[] message) {
+    int paddingSize = message.length % 16 == 16
+      ? 16
+      : 16 - (message.length % 16);
+    byte [] paddedMsg = new byte[message.length + paddingSize];
+    System.arraycopy(message, 0, paddedMsg, 0, message.length);
+    paddedMsg[message.length] = (byte) 0b10000000;
+    return paddedMsg;
+  }
+
+  private static byte[] unpad(byte[] message) {
+    int emptyBytes = 1;
+    for(int i = message.length - 1; message[i] == 0; i--) {
+      emptyBytes++;
+    }
+    byte[] result = new byte[message.length - emptyBytes];
+    System.arraycopy(message, 0, result, 0, result.length);
+    return result;
   }
 }
