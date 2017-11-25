@@ -33,7 +33,7 @@ class Key {
   }
 
   public byte [] getSec(String fileString) {
-    String filePath = "./" + fileString;
+    String filePath = "./" + fileString + ".txt";
     try {
       Path file = Paths.get(filePath);
       Files.createFile(file);
@@ -81,7 +81,7 @@ class Key {
   }
 
   private BigInteger readMod () {
-    String filePath = "./Modulus";
+    String filePath = "./Modulus.txt";
     try {
       StringBuffer fileData = new StringBuffer();
       BufferedReader reader = new BufferedReader(new FileReader(filePath));
