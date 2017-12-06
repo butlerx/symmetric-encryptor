@@ -33,18 +33,19 @@ import javax.crypto.spec.*;
 import javax.xml.bind.DatatypeConverter;
 
 class Key {
-  Key(){}
-  public byte [] get(byte [] pass) {
-    byte [] salt = getSec("salt");
+  Key() {}
+
+  public byte[] get(byte[] pass) {
+    byte[] salt = getSec("salt");
     byte[] salted = new byte[pass.length + salt.length];
     System.arraycopy(pass, 0, salted, 0, pass.length);
     System.arraycopy(salt, 0, salted, pass.length, salt.length);
-    byte [] hashedKey = hash(salted);
+    byte[] hashedKey = hash(salted);
     BigInteger encryptionKey = modPow(hashedKey);
     return hashedKey;
   }
 
-  private byte [] hash (byte [] digest) {
+  private byte[] hash(byte[] digest) {
     try {
       MessageDigest md = MessageDigest.getInstance("SHA-256");
       for (int i = 0; i < 199; i++) {
@@ -56,36 +57,36 @@ class Key {
     }
   }
 
-  public byte [] getSec(String fileString) {
+  public byte[] getSec(String fileString) {
     String filePath = "./" + fileString + ".txt";
     try {
       Path file = Paths.get(filePath);
       Files.createFile(file);
-      byte [] salt = new byte[16];
+      byte[] salt = new byte[16];
       SecureRandom random = new SecureRandom();
       random.nextBytes(salt);
       write(filePath, salt);
       return salt;
-    } catch(IOException err) {
+    } catch (IOException err) {
       byte[] salt = new byte[16];
-      try(FileInputStream fis = new FileInputStream(filePath)){
+      try (FileInputStream fis = new FileInputStream(filePath)) {
         fis.read(salt);
-      } catch(IOException e) {
+      } catch (IOException e) {
         System.out.println(e.getMessage());
       }
       return salt;
     }
   }
 
-  private BigInteger modPow(byte [] key) {
+  private BigInteger modPow(byte[] key) {
     BigInteger modulus = readMod();
-    if(modulus == BigInteger.ONE) return BigInteger.ZERO;
+    if (modulus == BigInteger.ONE) return BigInteger.ZERO;
     BigInteger base = new BigInteger(key);
     BigInteger exponent = new BigInteger("65537");
     BigInteger c = BigInteger.ONE;
     String ex = exponent.toString(2);
-    while(ex.length() > 0) {
-      if ( ex.substring(ex.length() - 1, ex.length()).equals("1")) {
+    while (ex.length() > 0) {
+      if (ex.substring(ex.length() - 1, ex.length()).equals("1")) {
         c = c.multiply(base).mod(modulus);
       }
       base = base.multiply(base).mod(modulus);
@@ -95,29 +96,31 @@ class Key {
     return c;
   }
 
-  private void write (String fileName, byte [] key) {
+  private void write(String fileName, byte[] key) {
     String data = DatatypeConverter.printHexBinary(key);
-    try(PrintWriter out = new PrintWriter(fileName)){
+    try (PrintWriter out = new PrintWriter(fileName)) {
       out.println(data);
-    } catch(IOException e) {
+    } catch (IOException e) {
       System.out.println(e.getMessage());
     }
   }
 
-  private BigInteger readMod () {
+  private BigInteger readMod() {
     String filePath = "./Modulus";
     try {
       StringBuffer fileData = new StringBuffer();
       BufferedReader reader = new BufferedReader(new FileReader(filePath));
       char[] buf = new char[1024];
-      int numRead=0;
-      while((numRead=reader.read(buf)) != -1){
+      int numRead = 0;
+      while ((numRead = reader.read(buf)) != -1) {
         String readData = String.valueOf(buf, 0, numRead);
         fileData.append(readData);
       }
       reader.close();
-      return new BigInteger(fileData.toString().replaceAll("\\s","").replaceAll("\\n", "").replaceAll("\\r", ""), 16);
-    } catch(IOException e) {
+      return new BigInteger(
+          fileData.toString().replaceAll("\\s", "").replaceAll("\\n", "").replaceAll("\\r", ""),
+          16);
+    } catch (IOException e) {
       return null;
     }
   }
@@ -127,13 +130,12 @@ public class SymetricEncryptor {
   public static void main(final String[] args) throws Exception {
     String arg = args[0];
     if (arg != null && !arg.isEmpty()) {
-      byte [] pass = getArg("Enter Password");
+      byte[] pass = getArg("Enter Password");
       Key key = new Key();
       if (arg.equals("-e")) {
         encrypt(args[1], key.get(pass));
         System.exit(0);
-      }
-      else if (arg.equals("-d")) {
+      } else if (arg.equals("-d")) {
         decrypt(args[1], args[2], key.get(pass));
         System.exit(0);
       }
@@ -142,20 +144,19 @@ public class SymetricEncryptor {
     System.exit(1);
   }
 
-  private static byte [] getArg(String msg) {
+  private static byte[] getArg(String msg) {
     Scanner scan = new Scanner(System.in);
-    System.out.print(msg+ ": ");
+    System.out.print(msg + ": ");
     String s = scan.next();
     scan.close();
     return s.getBytes(Charset.forName("UTF-8"));
   }
 
-
-  public static void encrypt(String file, byte [] key) {
+  public static void encrypt(String file, byte[] key) {
     try {
       SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
       Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
-      byte [] iv = new Key().getSec("iv");
+      byte[] iv = new Key().getSec("iv");
       IvParameterSpec ivspec = new IvParameterSpec(iv);
       cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivspec);
       Path path = Paths.get(file);
@@ -167,15 +168,20 @@ public class SymetricEncryptor {
     }
   }
 
-  public static void decrypt (String in, String out, byte [] key) {
+  public static void decrypt(String in, String out, byte[] key) {
     try {
       SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
       Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
-      byte [] iv = new Key().getSec("iv");
+      byte[] iv = new Key().getSec("iv");
       IvParameterSpec ivspec = new IvParameterSpec(iv);
       cipher.init(Cipher.DECRYPT_MODE, keySpec, ivspec);
       Path path = Paths.get(in);
-      byte[] message = DatatypeConverter.parseHexBinary(new String(Files.readAllBytes(path)).replaceAll("\\s","").replaceAll("\\n", "").replaceAll("\\r", ""));
+      byte[] message =
+          DatatypeConverter.parseHexBinary(
+              new String(Files.readAllBytes(path))
+                  .replaceAll("\\s", "")
+                  .replaceAll("\\n", "")
+                  .replaceAll("\\r", ""));
       byte[] decryptedMessage = unpad(cipher.doFinal(message));
       System.out.println(out);
       Path secPath = Paths.get(out);
@@ -186,10 +192,8 @@ public class SymetricEncryptor {
   }
 
   private static byte[] pad(byte[] message) {
-    int paddingSize = message.length % 16 == 16
-      ? 16
-      : 16 - (message.length % 16);
-    byte [] paddedMsg = new byte[message.length + paddingSize];
+    int paddingSize = message.length % 16 == 16 ? 16 : 16 - (message.length % 16);
+    byte[] paddedMsg = new byte[message.length + paddingSize];
     System.arraycopy(message, 0, paddedMsg, 0, message.length);
     paddedMsg[message.length] = (byte) 0b10000000;
     return paddedMsg;
@@ -197,7 +201,7 @@ public class SymetricEncryptor {
 
   private static byte[] unpad(byte[] message) {
     int emptyBytes = 1;
-    for(int i = message.length - 1; message[i] == 0; i--) {
+    for (int i = message.length - 1; message[i] == 0; i--) {
       emptyBytes++;
     }
     byte[] result = new byte[message.length - emptyBytes];
